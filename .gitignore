@@ -1,15 +1,59 @@
+# Gradle
+.gradle/
+build/
+*/build/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# Android Studio / IntelliJ IDEA
+.idea/
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+*.iws
+*.ipr
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/vcs.xml
+
+# 本地配置（包含SDK路径，不能提交）
 local.properties
+/local.properties
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+*.log
+
+# Android 编译产物（绝对不能提交）
+*.apk
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+
+# 签名密钥文件（极其重要，泄露会导致应用被恶意篡改）
+*.jks
+*.keystore
+*.p12
+*.pepk
+
+# 依赖缓存
+.externalNativeBuild
+.cxx/
+
+# 单元测试报告
+/test-results/
+/androidTest-results/
+
+# captures（录屏/截图临时文件）
+/captures/
+
+# 本地crash日志
+/crashlytics.properties
+fabric.properties
