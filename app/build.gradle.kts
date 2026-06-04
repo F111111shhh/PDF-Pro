@@ -5,22 +5,46 @@ plugins {
 
 android {
     namespace = "com.example.pdfpro"
-    // 【修复】原 compileSdk { version = release(36) } 不是标准Gradle DSL语法
     compileSdk = 36
+
+    val releaseStoreFilePath = providers.gradleProperty("PDF_PRO_STORE_FILE").orNull
+    val releaseStorePassword = providers.gradleProperty("PDF_PRO_STORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.gradleProperty("PDF_PRO_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.gradleProperty("PDF_PRO_KEY_PASSWORD").orNull
+    val hasReleaseSigning = listOf(
+        releaseStoreFilePath,
+        releaseStorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword
+    ).all { it != null }
 
     defaultConfig {
         applicationId = "com.example.pdfpro"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                storeFile = file(releaseStoreFilePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -42,6 +66,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.webkit)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
