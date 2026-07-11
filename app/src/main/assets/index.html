@@ -12,19 +12,20 @@
 :root{--primary:#007AFF;--bg:#1c1c1e;--pad:6px;--line-height:1.4;--font-family:-apple-system,"Microsoft YaHei",sans-serif}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);font-family:var(--font-family);overflow:hidden;user-select:none}
-::-webkit-scrollbar,#scrollWindow::-webkit-scrollbar,body::-webkit-scrollbar{display:none!important;width:0!important;height:0!important;background:transparent}
-#scrollWindow{position:absolute;top:0;left:0;right:0;bottom:0;overflow:auto;-webkit-overflow-scrolling:touch;z-index:1;touch-action:pan-x pan-y;display:flex;align-items:flex-start;scrollbar-width:none;-ms-overflow-style:none}
-#sizingContainer{position:relative;margin:0 auto;flex-shrink:0;transform-origin:0 0;will-change:width,height;opacity:0;transition:opacity .1s ease-out}
-#sizingContainer.visible{opacity:1}
-#contentLayer{position:absolute;top:0;left:0;transform-origin:0 0;padding-top:80px;padding-bottom:200px;will-change:transform}
-.page-container{position:relative;background:white;box-shadow:0 4px 15px rgba(0,0,0,.3);display:block;margin-bottom:15px;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:translateZ(0);-webkit-transform:translateZ(0)}
+#appRoot{position:relative;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden}
+#viewerArea{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:var(--bg)}
+#scrollWindow{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;padding-right:10px;scrollbar-width:none;-ms-overflow-style:none}
+#scrollWindow::-webkit-scrollbar{display:none}
+#sizingContainer{position:relative;margin:10px auto 0;transform-origin:0 0}
+#contentLayer{position:relative;transform-origin:0 0;padding-bottom:120px}
+.page-container{position:relative;background:white;box-shadow:0 4px 15px rgba(0,0,0,.3);display:block;margin:0 auto 15px}
 .page-container canvas{display:block;width:100%;height:100%;pointer-events:none}
-#customScrollbarTrack{position:fixed;right:2px;top:60px;bottom:40px;width:20px;z-index:3500;pointer-events:none}
-#scrollThumb{position:absolute;right:2px;width:6px;min-height:40px;background:rgba(255,255,255,.75);border-radius:3px;box-shadow:0 0 4px rgba(0,0,0,.8),0 0 1px rgba(0,0,0,.5) inset;border:1px solid rgba(255,255,255,.3);pointer-events:auto;opacity:0;transition:opacity .3s;touch-action:none}
-#scrollThumb.active{opacity:1}
-#scrollThumb::after{content:'';position:absolute;top:-10px;bottom:-10px;left:-15px;right:-10px}
-.toolbar{position:fixed;top:0;left:0;right:0;height:auto;background:#F5F5F7;padding:10px 16px;display:flex;flex-direction:column;gap:8px;z-index:2000;box-shadow:0 4px 20px rgba(0,0,0,.15);transition:transform .3s cubic-bezier(.25,1,.5,1);transform:translateZ(0);-webkit-transform:translateZ(0);backface-visibility:hidden;-webkit-backface-visibility:hidden}
-.toolbar.hidden{transform:translateY(-100%) translateZ(0);-webkit-transform:translateY(-100%) translateZ(0)}
+#customScrollbarTrack{position:absolute;right:1px;top:8px;bottom:12px;width:14px;z-index:15;pointer-events:none}
+#scrollThumb{position:absolute;right:3px;width:7px;min-height:48px;background:rgba(255,255,255,.88);border-radius:4px;box-shadow:0 0 4px rgba(0,0,0,.85),0 0 1px rgba(0,0,0,.5) inset;border:1px solid rgba(255,255,255,.5);pointer-events:auto;opacity:1;touch-action:none}
+#scrollThumb.hidden{display:none}
+#scrollThumb::after{content:'';position:absolute;top:-12px;bottom:-12px;left:-10px;right:-10px}
+.toolbar{position:relative;flex:0 0 auto;background:#F5F5F7;padding:10px 16px;display:flex;flex-direction:column;gap:8px;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.toolbar.hidden{display:flex}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .label-text{font-size:12px;color:#555;white-space:nowrap;width:30px}
 .btn{padding:6px 14px;border-radius:16px;border:none;font-weight:600;font-size:13px;color:#333;background:#e5e5ea;cursor:pointer;transition:all .2s}
@@ -34,17 +35,17 @@ html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);f
 #triggerColorBtn{width:32px;height:32px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.2)}
 #centerOpenBtn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:15px;color:#888;z-index:10;pointer-events:none}
 #centerOpenBtn button{pointer-events:auto}
-.page-pill{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;pointer-events:none;z-index:3000}
-.annotation-item,.input-box{position:absolute;font-family:var(--font-family);font-weight:bold;line-height:var(--line-height);padding:var(--pad);z-index:100;white-space:pre;border-radius:4px;transform-origin:0 0;min-width:10px;min-height:1em;transform:translateZ(0);-webkit-transform:translateZ(0);will-change:left,top}
+.page-pill{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;pointer-events:none;z-index:16}
+.annotation-item,.input-box{position:absolute;font-family:var(--font-family);font-weight:bold;line-height:var(--line-height);padding:var(--pad);z-index:100;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:4px;transform-origin:0 0;min-width:10px;min-height:1em}
 .annotation-item{border:1px solid transparent}
 .annotation-item.selected{border:1px solid var(--primary);background:rgba(0,122,255,.1);z-index:101}
 .input-box{background:rgba(255,255,255,.95);border:1px solid var(--primary);outline:none;resize:none;box-shadow:0 4px 15px rgba(0,0,0,.15);z-index:200;overflow:hidden}
 .del-btn{position:absolute;font-size:1em;width:1.3em;height:1.3em;top:-.65em;right:-.65em;align-items:center;justify-content:center;background:#FF3B30;color:#fff;border-radius:50%;box-shadow:0 2px 5px rgba(0,0,0,.3);z-index:102;display:none;cursor:pointer;pointer-events:auto}
 .del-btn::before{content:'×';font-size:.9em;line-height:1}
 .annotation-item.selected .del-btn{display:flex}
-.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:4000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;transform:translateZ(0);-webkit-transform:translateZ(0);backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:opacity}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:4000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
 .modal-overlay.active{opacity:1;pointer-events:auto}
-.color-panel{background:#fff;width:90%;max-width:380px;border-radius:20px;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.2);display:flex;flex-direction:column;gap:16px;transform:translateZ(0);-webkit-transform:translateZ(0)}
+.color-panel{background:#fff;width:90%;max-width:380px;border-radius:20px;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.2);display:flex;flex-direction:column;gap:16px}
 .cp-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:2px}
 .cp-cell{width:100%;padding-top:100%;border-radius:4px;cursor:pointer;position:relative}
 .cp-cell.active::after{content:'';position:absolute;top:2px;left:2px;right:2px;bottom:2px;border:2px solid #fff;border-radius:2px;box-shadow:0 0 2px rgba(0,0,0,.5)}
@@ -63,6 +64,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);f
 </style>
 </head>
 <body>
+<div id="appRoot">
 
 <div class="toolbar" id="mainToolbar">
     <div class="row">
@@ -84,6 +86,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);f
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
 </div>
 
+<div id="viewerArea">
 <div id="centerOpenBtn">
     <div style="font-size:40px">📄</div>
     <button class="btn" onclick="document.getElementById('fileInput').click()">打开 PDF 文件</button>
@@ -97,6 +100,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);f
 
 <div id="customScrollbarTrack"><div id="scrollThumb"></div></div>
 <div class="page-pill" id="pageInd">请打开文件</div>
+</div>
 <div class="app-message" id="appMessage" role="status" aria-live="polite"></div>
 
 <div class="modal-overlay" id="colorModal" onclick="closeColorModal(event)">
@@ -109,6 +113,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);f
         </div>
         <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="closeColorModal(null,true)">确定</button>
     </div>
+</div>
 </div>
 
 <script>
@@ -125,8 +130,8 @@ var colorState = { r: 255, g: 59, b: 48, a: 1.0 };
 var annotations = {};
 var lastBlurTS = 0, justDeleted = false;
 var scaleState = 1.0, baseWidth = 0, baseHeight = 0;
-var pageObserver = null;
-var pageInfoMap = {};
+var pageObserver = null, renderObserver = null;
+var pageInfoMap = {}, pageRenderState = {}, documentLoadId = 0;
 var isSaveInProgress = false, nativeSaveTimer = null, messageTimer = null;
 
 var scrollWindow = document.getElementById('scrollWindow');
@@ -275,22 +280,20 @@ function handleBackPress() {
 }
 
 /* ===== 滚动条 ===== */
-var scrollTimer = null, isThumbDrag = false, thumbDSY = 0, thumbDSST = 0;
+var isThumbDrag = false, thumbDSY = 0, thumbDSST = 0;
 
 function updateScrollThumb() {
     var st = scrollWindow.scrollTop, sH = scrollWindow.scrollHeight, cH = scrollWindow.clientHeight;
-    if (sH <= cH) { scrollThumb.style.opacity = '0'; return; }
-    scrollThumb.classList.add('active');
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(function() { if (!isThumbDrag) scrollThumb.classList.remove('active'); }, 1500);
-    var tH = scrollTrack.clientHeight, thH = Math.max(40, (cH / sH) * tH), mT = tH - thH;
+    if (sH <= cH + 1) { scrollThumb.classList.add('hidden'); return; }
+    scrollThumb.classList.remove('hidden');
+    var tH = scrollTrack.clientHeight, thH = Math.max(48, (cH / sH) * tH), mT = tH - thH;
     scrollThumb.style.height = thH + 'px';
     scrollThumb.style.transform = 'translateY(' + (st / (sH - cH)) * mT + 'px)';
 }
 
 scrollThumb.addEventListener('touchstart', function(e) {
     e.preventDefault(); e.stopPropagation();
-    isThumbDrag = true; scrollThumb.classList.add('active');
+    isThumbDrag = true;
     thumbDSY = e.touches[0].clientY; thumbDSST = scrollWindow.scrollTop;
 }, { passive: false });
 
@@ -303,7 +306,7 @@ window.addEventListener('touchmove', function(e) {
 }, { passive: false });
 
 window.addEventListener('touchend', function() {
-    if (isThumbDrag) { isThumbDrag = false; setTimeout(function() { scrollThumb.classList.remove('active'); }, 1000); }
+    isThumbDrag = false;
 });
 
 scrollWindow.addEventListener('scroll', updateScrollThumb);
@@ -312,9 +315,9 @@ window.addEventListener('resize', updateScrollThumb);
 /* ===== 工具栏 ===== */
 function toggleToolbar(f) {
     var t = document.getElementById('mainToolbar');
-    if (f !== undefined) isToolbarVisible = f; else isToolbarVisible = !isToolbarVisible;
-    if (isToolbarVisible) { t.classList.remove('hidden'); if (window.Android && window.Android.toggleStatusBar) window.Android.toggleStatusBar(true); }
-    else { t.classList.add('hidden'); if (window.Android && window.Android.toggleStatusBar) window.Android.toggleStatusBar(false); }
+    isToolbarVisible = true;
+    t.classList.remove('hidden');
+    if (window.Android && window.Android.toggleStatusBar) window.Android.toggleStatusBar(true);
 }
 
 scrollWindow.addEventListener('click', function(e) {
@@ -324,7 +327,6 @@ scrollWindow.addEventListener('click', function(e) {
     }
     if (e.target.closest('.input-box') || e.target.closest('.annotation-item') || e.target.closest('.del-btn')) return;
     if (isAnnotMode) { if (Date.now() - lastBlurTS < 200) return; return; }
-    toggleToolbar();
 });
 
 /* ===== 颜色 ===== */
@@ -393,21 +395,25 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
 });
 
 async function initView() {
-    sizingContainer.classList.remove('visible');
-    contentLayer.innerHTML = ''; scrollWindow.scrollTop = 0;
+    var loadId = ++documentLoadId;
+    contentLayer.innerHTML = '';
+    scrollWindow.scrollTop = 0;
+    scrollWindow.scrollLeft = 0;
     if (pageObserver) { pageObserver.disconnect(); pageObserver = null; }
+    if (renderObserver) { renderObserver.disconnect(); renderObserver = null; }
+    pageRenderState = {};
 
     var p1 = await pdfDoc.getPage(1);
     var vp1 = p1.getViewport({ scale: 1 });
-    var screenW = window.innerWidth;
-    var initialScale = (screenW - 20) / vp1.width;
-    var maxW = 0, totalH = 80;
+    var availableWidth = Math.max(1, scrollWindow.clientWidth - 22);
+    var initialScale = availableWidth / vp1.width;
+    var maxW = 0, totalH = 0;
 
     for (var i = 1; i <= totalPages; i++) {
         var pd = document.createElement('div');
         pd.className = 'page-container'; pd.id = 'page-' + i; pd.setAttribute('data-page', i);
 
-        var page = await pdfDoc.getPage(i);
+        var page = i === 1 ? p1 : await pdfDoc.getPage(i);
         var vpOrig = page.getViewport({ scale: 1 });
         var vpBase = page.getViewport({ scale: initialScale });
         var cssW = Math.floor(vpBase.width);
@@ -424,16 +430,10 @@ async function initView() {
         if (vpTest.width > maxDim || vpTest.height > maxDim) {
             rScale *= Math.min(maxDim / vpTest.width, maxDim / vpTest.height);
         }
-        var vpRender = page.getViewport({ scale: rScale });
 
         pd.style.width = cssW + 'px'; pd.style.height = cssH + 'px';
         contentLayer.appendChild(pd);
-
-        var canvas = document.createElement('canvas');
-        var ctx = canvas.getContext('2d');
-        canvas.width = vpRender.width; canvas.height = vpRender.height;
-        await page.render({ canvasContext: ctx, viewport: vpRender }).promise;
-        pd.appendChild(canvas);
+        pageRenderState[i] = { rendered: false, rendering: false, renderToken: 0, canvas: null, renderTask: null, unloadTimer: null, renderScale: rScale };
 
         if (vpBase.width > maxW) maxW = vpBase.width;
         totalH += vpBase.height + 15;
@@ -443,13 +443,12 @@ async function initView() {
     contentLayer.style.width = baseWidth + 'px';
     contentLayer.style.height = baseHeight + 'px';
     scaleState = 1.0; zoomSlider.value = 1.0; zoomValDisplay.innerText = '1.0';
-    updateZoomLayout(); setupPageObserver();
-    requestAnimationFrame(function() {
-        requestAnimationFrame(function() { sizingContainer.classList.add('visible'); });
-    });
+    updateZoomLayout();
+    setupPageObserver(loadId);
+    renderPage(1, document.getElementById('page-1'), loadId);
 }
 
-function setupPageObserver() {
+function setupPageObserver(loadId) {
     pageObserver = new IntersectionObserver(function(entries) {
         var maxR = 0, best = null;
         entries.forEach(function(en) {
@@ -457,7 +456,74 @@ function setupPageObserver() {
         });
         if (best) document.getElementById('pageInd').innerText = best + ' / ' + totalPages;
     }, { threshold:[0.1, 0.3, 0.5, 0.7], root: scrollWindow });
-    document.querySelectorAll('.page-container').forEach(function(el) { pageObserver.observe(el); });
+    renderObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            var pageNumber = parseInt(entry.target.getAttribute('data-page'));
+            if (entry.isIntersecting) {
+                var state = pageRenderState[pageNumber];
+                if (state) { clearTimeout(state.unloadTimer); state.unloadTimer = null; }
+                renderPage(pageNumber, entry.target, loadId);
+            } else {
+                schedulePageUnload(pageNumber, entry.target);
+            }
+        });
+    }, { root: scrollWindow, rootMargin: '1200px 0px', threshold: 0.01 });
+    document.querySelectorAll('.page-container').forEach(function(el) {
+        pageObserver.observe(el);
+        renderObserver.observe(el);
+    });
+}
+
+async function renderPage(pageNumber, container, loadId) {
+    var state = pageRenderState[pageNumber];
+    if (!state || state.rendered || state.rendering || loadId !== documentLoadId) return;
+
+    state.rendering = true;
+    var renderToken = ++state.renderToken;
+    try {
+        var page = await pdfDoc.getPage(pageNumber);
+        if (loadId !== documentLoadId || state.renderToken !== renderToken) return;
+        var viewport = page.getViewport({ scale: state.renderScale });
+        var canvas = document.createElement('canvas');
+        canvas.className = 'page-canvas';
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        container.insertBefore(canvas, container.firstChild);
+        state.canvas = canvas;
+        state.renderTask = page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+        await state.renderTask.promise;
+        if (loadId !== documentLoadId || state.renderToken !== renderToken || state.canvas !== canvas) {
+            canvas.remove();
+            return;
+        }
+        state.rendered = true;
+    } catch (err) {
+        if (loadId === documentLoadId && state.renderToken === renderToken) console.error('页面渲染失败:', err);
+    } finally {
+        if (state.renderToken === renderToken) {
+            state.rendering = false;
+            state.renderTask = null;
+        }
+    }
+}
+
+function schedulePageUnload(pageNumber, container) {
+    var state = pageRenderState[pageNumber];
+    if (!state || !state.rendered || state.unloadTimer) return;
+    state.unloadTimer = setTimeout(function() {
+        state.unloadTimer = null;
+        if (container.querySelector('.input-box')) return;
+        var canvas = state.canvas;
+        if (canvas) {
+            ++state.renderToken;
+            if (state.renderTask) state.renderTask.cancel();
+            canvas.width = 1;
+            canvas.height = 1;
+            canvas.remove();
+            state.canvas = null;
+            state.rendered = false;
+        }
+    }, 750);
 }
 
 /* ===== 缩放 ===== */
@@ -479,6 +545,7 @@ function applyZoom(ns) {
     var nw = baseWidth * ns, nlo = nw < r.width ? (r.width - nw) / 2 : 0;
     scrollWindow.scrollLeft = Math.max(0, nw <= r.width ? 0 : (ax * ns) + nlo - vcx);
     scrollWindow.scrollTop = Math.max(0, (ay * ns) - vcy);
+    updateScrollThumb();
 }
 
 function handleSliderZoom(v) { applyZoom(+v); }
@@ -519,6 +586,9 @@ function createNewInput(wrapper, xPx, yPx, initText, unused, optFS, optClr) {
     var pgW = parseFloat(wrapper.style.width);
     var pgH = parseFloat(wrapper.style.height);
     var edge = PAD + BW;
+    var preferredInputWidth = Math.min(pgW - edge, Math.max(160, fs * 5));
+    xPx = Math.max(0, Math.min(pgW - preferredInputWidth - edge, xPx));
+    yPx = Math.max(0, Math.min(pgH - (fs * LH + edge * 2), yPx));
 
     var input = document.createElement('textarea');
     input.className = 'input-box';
@@ -538,9 +608,15 @@ function createNewInput(wrapper, xPx, yPx, initText, unused, optFS, optClr) {
             if (m.width > maxLW) maxLW = m.width;
             if (m.height > lineH) lineH = m.height;
         }
-        var tw = Math.max(28, Math.ceil(maxLW) + edge * 2);
-        var th = Math.ceil(lineH * lines.length) + edge * 2;
-        input.style.width = tw + 'px'; input.style.height = th + 'px';
+        var maxW = Math.max(28, pgW - xPx - edge);
+        var tw = Math.min(maxW, Math.max(28, Math.ceil(maxLW) + edge * 2));
+        input.style.width = tw + 'px';
+        input.style.height = 'auto';
+        var th = Math.max(Math.ceil(lineH * lines.length) + edge * 2, input.scrollHeight);
+        yPx = Math.max(0, Math.min(pgH - th, yPx));
+        input.style.left = (xPx / pgW * 100) + '%';
+        input.style.top = (yPx / pgH * 100) + '%';
+        input.style.height = th + 'px';
     };
 
     input.addEventListener('input', autoResize);
@@ -583,8 +659,10 @@ function makeDraggable(el, page, onDragEnd, onTapSelected) {
                 if (!isDrag) { rafPending = false; return; }
                 var pr = page.getBoundingClientRect(), sc = pr.width / parseFloat(page.style.width);
                 var pw = parseFloat(page.style.width), ph = parseFloat(page.style.height);
-                el.style.left = Math.max(0, Math.min(95, dsl + (currentDx / sc) / pw * 100)) + '%';
-                el.style.top = Math.max(0, Math.min(98, dst + (currentDy / sc) / ph * 100)) + '%';
+                var maxLeft = Math.max(0, 100 - (el.offsetWidth / pw * 100));
+                var maxTop = Math.max(0, 100 - (el.offsetHeight / ph * 100));
+                el.style.left = Math.max(0, Math.min(maxLeft, dsl + (currentDx / sc) / pw * 100)) + '%';
+                el.style.top = Math.max(0, Math.min(maxTop, dst + (currentDy / sc) / ph * 100)) + '%';
                 rafPending = false;
             });
         }

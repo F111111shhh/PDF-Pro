@@ -12,7 +12,7 @@ android {
         applicationId = "com.example.pdfpro"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
+        versionCode = 3
         versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -21,7 +21,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".beta"
-            versionNameSuffix = "-beta1"
+            versionNameSuffix = "-beta2"
         }
         release {
             isMinifyEnabled = false
