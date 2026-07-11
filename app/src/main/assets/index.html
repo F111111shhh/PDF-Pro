@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>PDF Pro</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<link rel="icon" href="data:,">
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js';</script>
+<script src="vendor/pdf-lib/pdf-lib.min.js"></script>
 <style>
 :root{--primary:#007AFF;--bg:#1c1c1e;--pad:6px;--line-height:1.4;--font-family:-apple-system,"Microsoft YaHei",sans-serif}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -56,6 +57,9 @@ html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);f
 .presets-wrapper::-webkit-scrollbar{display:none}
 .preset-dot{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:1px solid rgba(0,0,0,.1);cursor:pointer;transition:transform .2s,opacity .2s}
 .add-btn{width:32px;height:32px;border-radius:50%;flex-shrink:0;background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
+.app-message{position:fixed;left:50%;bottom:72px;max-width:calc(100% - 32px);padding:9px 14px;background:rgba(28,28,30,.94);color:#fff;border-radius:6px;font-size:13px;line-height:1.4;z-index:5000;opacity:0;transform:translate(-50%,8px);pointer-events:none;transition:opacity .18s,transform .18s;text-align:center}
+.app-message.visible{opacity:1;transform:translate(-50%,0)}
+.app-message.error{background:rgba(180,28,28,.96)}
 </style>
 </head>
 <body>
@@ -93,6 +97,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);f
 
 <div id="customScrollbarTrack"><div id="scrollThumb"></div></div>
 <div class="page-pill" id="pageInd">请打开文件</div>
+<div class="app-message" id="appMessage" role="status" aria-live="polite"></div>
 
 <div class="modal-overlay" id="colorModal" onclick="closeColorModal(event)">
     <div class="color-panel" onclick="event.stopPropagation()">
@@ -114,6 +119,7 @@ var FF = '-apple-system, "Microsoft YaHei", sans-serif';
 /* ===== 全局状态 ===== */
 var isAnnotMode = false, isToolbarVisible = true;
 var originalFileBuffer = null, pdfDoc = null, totalPages = 0;
+var currentFileName = '';
 var currentFontSize = 14;
 var colorState = { r: 255, g: 59, b: 48, a: 1.0 };
 var annotations = {};
@@ -121,6 +127,7 @@ var lastBlurTS = 0, justDeleted = false;
 var scaleState = 1.0, baseWidth = 0, baseHeight = 0;
 var pageObserver = null;
 var pageInfoMap = {};
+var isSaveInProgress = false, nativeSaveTimer = null, messageTimer = null;
 
 var scrollWindow = document.getElementById('scrollWindow');
 var sizingContainer = document.getElementById('sizingContainer');
@@ -129,6 +136,35 @@ var zoomSlider = document.getElementById('zoomSlider');
 var zoomValDisplay = document.getElementById('zoomVal');
 var scrollThumb = document.getElementById('scrollThumb');
 var scrollTrack = document.getElementById('customScrollbarTrack');
+
+function showMessage(message, isError) {
+    var box = document.getElementById('appMessage');
+    clearTimeout(messageTimer);
+    box.textContent = message;
+    box.classList.toggle('error', !!isError);
+    box.classList.add('visible');
+    messageTimer = setTimeout(function() { box.classList.remove('visible'); }, 3200);
+}
+
+function setSaveBusy(busy) {
+    isSaveInProgress = busy;
+    var btn = document.getElementById('saveBtn');
+    btn.disabled = busy || !pdfDoc;
+    btn.innerText = busy ? '保存中...' : '💾 保存';
+}
+
+window.onNativeSaveResult = function(success, message) {
+    clearTimeout(nativeSaveTimer);
+    nativeSaveTimer = null;
+    setSaveBusy(false);
+    showMessage(success ? '已保存到下载文件夹' : '保存失败：' + message, !success);
+};
+
+function buildOutputFileName() {
+    var base = (currentFileName || 'document.pdf').replace(/\.pdf$/i, '');
+    base = base.replace(/[\\/:*?"<>|]/g, '-').trim() || 'document';
+    return base + '-PDF-Pro-annotated-' + Date.now() + '.pdf';
+}
 
 /* ===== DOM 文字测量 ===== */
 var _mSpan = document.createElement('span');
@@ -336,15 +372,23 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
     var file = e.target.files[0]; if (!file) return;
     var reader = new FileReader();
     reader.onload = async function(ev) {
-        originalFileBuffer = ev.target.result.slice(0);
+        var candidateBuffer = ev.target.result.slice(0);
         try {
-            pdfDoc = await pdfjsLib.getDocument({ data: originalFileBuffer.slice(0) }).promise;
+            var candidateDoc = await pdfjsLib.getDocument({ data: candidateBuffer.slice(0) }).promise;
+            originalFileBuffer = candidateBuffer;
+            pdfDoc = candidateDoc;
+            currentFileName = file.name || 'document.pdf';
             totalPages = pdfDoc.numPages; annotations = {}; pageInfoMap = {};
             document.getElementById('centerOpenBtn').style.display = 'none';
             document.getElementById('saveBtn').disabled = false;
             await initView(); toggleToolbar(true);
-        } catch (err) { alert('解析失败: ' + err.message); }
+            showMessage('已打开：' + currentFileName, false);
+        } catch (err) {
+            console.error(err);
+            showMessage('PDF 解析失败：' + err.message, true);
+        }
     };
+    reader.onerror = function() { showMessage('无法读取所选文件', true); };
     reader.readAsArrayBuffer(file); this.value = '';
 });
 
@@ -687,15 +731,24 @@ function captureAnnotation(text, fontSize, colorStr, wCss, hCss) {
 }
 
 async function savePDF() {
-    var btn = document.getElementById('saveBtn');
-    btn.disabled = true; btn.innerText = '生成中...';
+    if (isSaveInProgress || !originalFileBuffer || !pdfDoc) return;
+    var activeInput = document.querySelector('textarea.input-box');
+    if (activeInput) {
+        activeInput.blur();
+        await new Promise(function(resolve) { setTimeout(resolve, 0); });
+    }
+    setSaveBusy(true);
     try {
         var pdfDocOut = await PDFLib.PDFDocument.load(originalFileBuffer.slice(0));
         var pages = pdfDocOut.getPages();
 
         var hasAny = false;
         for (var k in annotations) { if (annotations[k] && annotations[k].length > 0) { hasAny = true; break; } }
-        if (!hasAny) { alert('没有需要保存的批注'); return; }
+        if (!hasAny) {
+            showMessage('没有需要保存的批注', true);
+            setSaveBusy(false);
+            return;
+        }
 
         for (var pKey in annotations) {
             var pIdx = parseInt(pKey) - 1;
@@ -723,19 +776,24 @@ async function savePDF() {
         }
 
         var base64Pdf = await pdfDocOut.saveAsBase64();
-        var fileName = '批注文件_' + Date.now() + '.pdf';
+        var fileName = buildOutputFileName();
 
         if (window.Android && window.Android.saveBase64Pdf) {
             window.Android.saveBase64Pdf(base64Pdf, fileName);
+            nativeSaveTimer = setTimeout(function() {
+                window.onNativeSaveResult(false, '保存超时，请重试');
+            }, 120000);
         } else {
             var link = document.createElement('a');
             link.href = 'data:application/pdf;base64,' + base64Pdf;
             link.download = fileName; link.click();
+            setSaveBusy(false);
+            showMessage('文件已生成', false);
         }
     } catch (err) {
-        console.error(err); alert('保存错误: ' + err.message);
-    } finally {
-        btn.disabled = false; btn.innerText = '💾 保存';
+        console.error(err);
+        setSaveBusy(false);
+        showMessage('保存错误：' + err.message, true);
     }
 }
 </script>
