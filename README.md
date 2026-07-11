@@ -1,92 +1,96 @@
-# PDF Pro 2.0
+# PDF Pro - 随身PDF批注大师
 
 <p align="center">
   <img width="120" height="120" alt="PDF Pro Logo" src="https://github.com/user-attachments/assets/15b4ca6f-0b37-4ee0-9123-90b1e3b8de18" />
+
 </p>
 
-<h3 align="center">Offline-first PDF annotation for Android / Android 本地 PDF 批注工具</h3>
+<h3 align="center">在手机上优雅地批注PDF，像在纸上书写一样自然</h3>
 
 <p align="center">
-  <a href="#download--下载">Download</a> ·
-  <a href="#features--功能">Features</a> ·
-  <a href="#usage--使用">Usage</a> ·
-  <a href="#architecture--架构">Architecture</a>
+  <a href="#下载">立即下载</a> · 
+  <a href="#功能亮点">功能亮点</a> · 
+  <a href="#使用指南">使用指南</a>
 </p>
 
 ---
 
-## Overview / 简介
+## 简介
 
-PDF Pro is a lightweight Android app for annotating PDFs locally. It is designed for contracts, forms, papers, and quick markups where privacy and speed matter.
+PDF Pro是一款专为Android打造的轻量级PDF批注工具。无需注册账号，无需联网（除首次加载引擎外），打开即用。适合需要快速标记合同、批注论文、填写表格的用户。
 
-PDF Pro 是一款轻量级 Android PDF 批注应用，适合合同签字、表格填写、论文阅读和临时标记。文档处理全部在本机完成，无需账号，也不需要把 PDF 上传到服务器。
+**核心体验**：选择文件 → 点击批注 → 输入文字 → 拖动调整位置 → 保存。就是这么简单。
 
-## Features / 功能
+## 功能亮点
 
-- **Offline PDF engine / 离线 PDF 引擎**: PDF.js, the PDF worker, and pdf-lib are bundled inside the APK. No CDN loading is required.
-- **Text annotation / 文字批注**: add, edit, drag, delete, resize, recolor, and save text annotations.
-- **Highlight and box / 高亮与矩形框**: mark passages with translucent highlights or draw visible boxes around important content.
-- **Signature and freehand ink / 签名与手写**: draw signatures or quick freehand notes directly on the page.
-- **Pinch zoom and fast scroll / 手势缩放与快速滚动**: pinch from 0.5x to 4.0x and use the side scroll thumb for long documents.
-- **Standard PDF output / 标准 PDF 输出**: annotations are embedded into a saved PDF that can be opened by WPS, Adobe Acrobat, system viewers, and other PDF readers.
-- **Safer WebView shell / 更安全的 WebView 外壳**: local HTTPS asset loading, no mixed-content loading, and reduced file-access surface.
+### 🎯 精准批注，所见即所得
+- **智能文字定位**：独创的基线对齐算法，文字位置精准到像素级，保存后的PDF与预览完全一致
+- **自由字号调节**：5px-60px无级缩放，从细小批注到醒目标记都能胜任
+- **全色域支持**：RGBA色板 + 透明度调节，标记重点、半透明高亮随心所欲
 
-## Download / 下载
+### 📱 为触控而生的交互
+- **双指手势**：捏合缩放（0.5x-4.0x），单指拖拽批注框，操作如相册般顺滑
+- **防误触设计**：点击空白处收工具栏，可单独开关批注模式，删除按钮仅在点击选中批注时出现
+- **横竖屏自适应**：旋转屏幕不丢失编辑状态，躺着坐着都能用
 
-Download the latest APK from [GitHub Releases](../../releases/latest).
+### 💾 本地存储，隐私无忧
+- **零权限骚扰**：仅需存储权限（Android 9以下），高版本使用系统下载目录无需额外授权
+- **标准PDF输出**：批注直接嵌入PDF标准格式，其他软件（WPS、Adobe Acrobat）均可查看
+- **离线工作**：除首次启动加载渲染引擎外，全程无需网络，加密文档也能放心处理
 
-从 [GitHub Releases](../../releases/latest) 下载最新 APK。
+## 使用场景
 
-**Requirement / 系统要求**: Android 7.0 (API 24) or later.
+| 场景 | 使用方法 |
+|------|---------|
+| **合同签字** | 打开合同 → 批注模式 → 添加签名文字 → 调整红色醒目颜色 → 保存发送 |
+| **论文批注** | 导入文献 → 双指缩放段落 → 添加注释文字 → 小号字体放置行间 → 保存归档 |
+| **表格填写** | 打开PDF表格 → 在空白处添加文字 → 拖拽到对应位置 → 覆盖原空白 → 提交 |
+| **重点标记** | 高透明度红色 → 大号字体 → 覆盖重点段落 → 半透明显示原文字 |
 
-## Usage / 使用
+## 下载
 
-1. Tap **Open / 打开** and choose a PDF.
-2. Choose an annotation mode: text, highlight, box, or signature.
-3. Tap or draw on the page to create an annotation.
-4. Tap an annotation to select it; drag to move it; tap selected text again to edit it.
-5. Tap the red delete button on a selected annotation to remove it.
-6. Tap **Save / 保存**. The exported PDF is saved to Downloads with a readable timestamped name.
+📥 **[点击下载最新版本 APK](../../releases/latest)**
 
-## Architecture / 架构
+**系统要求**：Android 7.0 (API 24) 及以上
 
-- **Android shell**: Kotlin Activity + WebView.
-- **Asset loading**: AndroidX WebKit `WebViewAssetLoader` serves bundled assets through a local HTTPS origin.
-- **Rendering**: bundled PDF.js renders pages to canvas.
-- **PDF writing**: bundled pdf-lib embeds text, highlights, boxes, and freehand ink into a new PDF.
-- **Native bridge**: the JavaScript bridge exposes only save and system UI methods.
+## 使用指南
 
-## Release Notes / 发布说明
+### 快速开始
+1. **打开文件**：点击"📂 打开"选择PDF，或直接点击中心区域
+2. **进入批注**：点击"✎ 批注"按钮，工具栏高亮表示准备就绪
+3. **添加文字**：点击页面任意位置输入文字，可手动换行，完成点击外部保存
+4. **调整位置**：单指按住批注框拖拽，红色删除按钮出现时还可可点击移除批注
+5. **修改内容**：选中批注后再次点击，进入编辑模式可修改内容
+6. **保存文件**：点击"💾 保存"，文件自动存入系统"下载"文件夹，原文件名加"批注_"
 
-See [v2.0.0 release notes](docs/release-notes/v2.0.0.md).
+### 进阶技巧
+- **精准操作**：不仅可以丝滑缩放与滑动，还支持工具栏单独进行基准缩放调节与右边滚动条拖动翻页，微调位置后再查看整体效果
+- **多层批注**：支持同一位置叠加多个批注，实现"文字+高亮框"组合效果
 
-## Screenshots / 截图
+## 截图展示
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1cbd9ba7-d534-40ae-a6c2-06606199e067" width="30%" alt="Home"/>
-  <img src="https://github.com/user-attachments/assets/99e2c21a-c443-49d5-83ff-d88d22af9e0b" width="30%" alt="Annotation"/>
-  <img src="https://github.com/user-attachments/assets/d83e08eb-7256-4c03-8e25-fc9ca81df910" width="30%" alt="Color picker"/>
+  <img src="https://github.com/user-attachments/assets/1cbd9ba7-d534-40ae-a6c2-06606199e067" width="30%" alt="主页面"/>
+  <img src="https://github.com/user-attachments/assets/99e2c21a-c443-49d5-83ff-d88d22af9e0b" width="30%" alt="批注模式"/>
+  <img src="https://github.com/user-attachments/assets/d83e08eb-7256-4c03-8e25-fc9ca81df910" width="30%" alt="颜色选择"/>
 </p>
 
-## Development / 开发
+## 技术架构简述
 
-```bash
-./gradlew :app:assembleDebug :app:testDebugUnitTest
-```
+- **前端渲染**：PDF.js + WebView，确保渲染精度与桌面浏览器一致
+- **文档处理**：pdf-lib.js 纯前端PDF编辑，无需上传服务器
+- **原生桥接**：Kotlin封装Android存储API，适配Android 14存储权限新规
 
-For release signing, provide these Gradle properties:
+## 开源协议
 
-```properties
-PDF_PRO_STORE_FILE=/path/to/release.jks
-PDF_PRO_STORE_PASSWORD=...
-PDF_PRO_KEY_ALIAS=...
-PDF_PRO_KEY_PASSWORD=...
-```
+本项目基于 [MIT License](./LICENSE) 开源，可自由用于个人或商业用途。
 
-If the original v1.0.0 signing key is unavailable, a newly signed APK may require users to uninstall the previous version before installing v2.0.0.
+## 反馈与建议
 
-如果无法沿用 v1.0.0 的原签名密钥，新签名 APK 可能需要用户先卸载旧版再安装 v2.0.0。
+如有问题或建议，欢迎提交 [Issue](../../issues) 或邮件联系。
 
-## License / 协议
+---
 
-MIT License. See [LICENSE](LICENSE).
+<p align="center">
+  Made with ❤️ on Android
+</p>
