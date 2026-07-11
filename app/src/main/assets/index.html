@@ -14,6 +14,7 @@
 html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);font-family:var(--font-family);overflow:hidden;user-select:none}
 #appRoot{position:relative;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden}
 #viewerArea{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:var(--bg)}
+.saving #viewerArea{pointer-events:none}
 #scrollWindow{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;padding-right:10px;scrollbar-width:none;-ms-overflow-style:none}
 #scrollWindow::-webkit-scrollbar{display:none}
 #sizingContainer{position:relative;margin:10px auto 0;transform-origin:0 0}
@@ -132,7 +133,7 @@ var lastBlurTS = 0, justDeleted = false;
 var scaleState = 1.0, baseWidth = 0, baseHeight = 0;
 var pageObserver = null, renderObserver = null;
 var pageInfoMap = {}, pageRenderState = {}, documentLoadId = 0;
-var isSaveInProgress = false, nativeSaveTimer = null, messageTimer = null;
+var isSaveInProgress = false, isAnnotationDragging = false, nativeSaveTimer = null, messageTimer = null;
 
 var scrollWindow = document.getElementById('scrollWindow');
 var sizingContainer = document.getElementById('sizingContainer');
@@ -153,6 +154,7 @@ function showMessage(message, isError) {
 
 function setSaveBusy(busy) {
     isSaveInProgress = busy;
+    document.getElementById('appRoot').classList.toggle('saving', busy);
     var btn = document.getElementById('saveBtn');
     btn.disabled = busy || !pdfDoc;
     btn.innerText = busy ? '保存中...' : '💾 保存';
@@ -183,6 +185,12 @@ function measureLine(text, fs) {
     _mSpan.textContent = text || '\u00A0';
     return _mSpan.getBoundingClientRect();
 }
+
+var _wrapProbe = document.createElement('div');
+_wrapProbe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;visibility:hidden;' +
+    'white-space:pre-wrap;overflow-wrap:anywhere;font-weight:bold;padding:0;border:0;margin:0;' +
+    'line-height:' + LH + ';font-family:' + FF;
+document.body.appendChild(_wrapProbe);
 
 function measureBaselineOffset(fontSize) {
     var div = document.createElement('div');
@@ -667,10 +675,13 @@ function makeDraggable(el, page, onDragEnd, onTapSelected) {
             });
         }
     };
-    var endH = function() {
+    var endH = function(e) {
         if (!isDrag) return; isDrag = false;
-        window.removeEventListener('touchmove', moveH); window.removeEventListener('touchend', endH);
+        isAnnotationDragging = false;
+        window.removeEventListener('touchmove', moveH); window.removeEventListener('touchend', endH); window.removeEventListener('touchcancel', endH);
         window.removeEventListener('mousemove', moveH); window.removeEventListener('mouseup', endH);
+
+        if (e && e.type === 'touchcancel') return;
         
         if (!moved) { 
             // 如果没发生拖动，说明是在已选中的批注上点了一下，触发编辑
@@ -692,8 +703,8 @@ function makeDraggable(el, page, onDragEnd, onTapSelected) {
         e.preventDefault(); e.stopPropagation();
         var t = e.touches ? e.touches[0] : e;
         dsx = t.clientX; dsy = t.clientY; dsl = parseFloat(el.style.left); dst = parseFloat(el.style.top);
-        isDrag = true; moved = false;
-        window.addEventListener('touchmove', moveH, { passive: false }); window.addEventListener('touchend', endH);
+        isDrag = true; moved = false; isAnnotationDragging = true;
+        window.addEventListener('touchmove', moveH, { passive: false }); window.addEventListener('touchend', endH); window.addEventListener('touchcancel', endH);
         window.addEventListener('mousemove', moveH); window.addEventListener('mouseup', endH);
     };
     el.addEventListener('touchstart', startH, { passive: false }); el.addEventListener('mousedown', startH);
@@ -758,16 +769,61 @@ function removeData(p, id) {
     annotations[p] = annotations[p].filter(function(a) { return a.id !== id; });
 }
 
+function wrapAnnotationText(text, fontSize, maxTextWidth) {
+    var sourceLines = String(text || '').replace(/\r/g, '').split('\n');
+    var wrapped = [];
+    _wrapProbe.style.fontSize = fontSize + 'px';
+    _wrapProbe.style.width = maxTextWidth + 'px';
+
+    for (var lineIndex = 0; lineIndex < sourceLines.length; lineIndex++) {
+        var sourceLine = sourceLines[lineIndex];
+        if (!sourceLine) {
+            wrapped.push('');
+            continue;
+        }
+
+        _wrapProbe.textContent = sourceLine;
+        var textNode = _wrapProbe.firstChild;
+        var range = document.createRange();
+        var currentLine = '';
+        var currentTop = null;
+        var codeUnitOffset = 0;
+        Array.from(sourceLine).forEach(function(character) {
+            range.setStart(textNode, codeUnitOffset);
+            codeUnitOffset += character.length;
+            range.setEnd(textNode, codeUnitOffset);
+            var rect = range.getClientRects()[0];
+            var characterTop = rect ? rect.top : currentTop;
+
+            if (currentLine && currentTop !== null && characterTop !== null && Math.abs(characterTop - currentTop) > 1) {
+                wrapped.push(currentLine);
+                currentLine = character;
+                currentTop = characterTop;
+            } else {
+                if (!currentLine) currentTop = characterTop;
+                currentLine += character;
+            }
+        });
+        range.detach();
+        wrapped.push(currentLine);
+    }
+    _wrapProbe.textContent = '';
+    return wrapped.length ? wrapped : [''];
+}
+
 function captureAnnotation(text, fontSize, colorStr, wCss, hCss) {
     var DPR = 8;
+    var edgeCss = PAD + BW;
+    var textWidthCss = Math.max(1, wCss - edgeCss * 2);
+    var lines = wrapAnnotationText(text, fontSize, textWidthCss);
+    var cssLineH = measureLine('Mg中', fontSize).height;
+    var requiredHeightCss = Math.max(hCss, Math.ceil(lines.length * cssLineH + edgeCss * 2));
     var cW = Math.round(wCss * DPR);
-    var cH = Math.round(hCss * DPR);
+    var cH = Math.round(requiredHeightCss * DPR);
     if (cW <= 0 || cH <= 0 || cW > 16384 || cH > 16384) return { data: new Uint8Array(0) };
 
-    var edge = (PAD + BW) * DPR;
+    var edge = edgeCss * DPR;
     var fontPx = fontSize * DPR;
-
-    var cssLineH = measureLine('Mg中', fontSize).height;
     var canvasLineH = cssLineH * DPR;
 
     var baselineCSS = measureBaselineOffset(fontSize);
@@ -781,7 +837,6 @@ function captureAnnotation(text, fontSize, colorStr, wCss, hCss) {
     ctx.fillStyle = colorStr;
     ctx.textBaseline = 'alphabetic';
 
-    var lines = text.split('\n');
     for (var i = 0; i < lines.length; i++) {
         var lineText = lines[i];
         if (!lineText) continue;
@@ -791,11 +846,9 @@ function captureAnnotation(text, fontSize, colorStr, wCss, hCss) {
         var canvasLineW = ctx.measureText(lineText).width;
         
         var scaleX = (canvasLineW > 0 && domLineW > 0) ? (domLineW * DPR) / canvasLineW : 1;
-        var scaleY = scaleX;
-
         ctx.save();
         ctx.translate(edge, baseY);
-        ctx.scale(scaleX, scaleY);
+        ctx.scale(scaleX, 1);
         ctx.fillText(lineText, 0, 0);
         ctx.restore();
     }
@@ -805,30 +858,37 @@ function captureAnnotation(text, fontSize, colorStr, wCss, hCss) {
     var buf = new ArrayBuffer(bs.length);
     var u8 = new Uint8Array(buf);
     for (var j = 0; j < bs.length; j++) u8[j] = bs.charCodeAt(j);
-    return { data: u8 };
+    return { data: u8, heightCss: requiredHeightCss };
 }
 
 async function savePDF() {
     if (isSaveInProgress || !originalFileBuffer || !pdfDoc) return;
-    var activeInput = document.querySelector('textarea.input-box');
-    if (activeInput) {
-        activeInput.blur();
-        await new Promise(function(resolve) { setTimeout(resolve, 0); });
+    if (isAnnotationDragging) {
+        showMessage('请先松开批注，再保存', true);
+        return;
     }
     setSaveBusy(true);
     try {
+        var activeInput = document.querySelector('textarea.input-box');
+        if (activeInput) {
+            activeInput.blur();
+            await new Promise(function(resolve) { setTimeout(resolve, 0); });
+        }
+        var annotationSnapshot = JSON.parse(JSON.stringify(annotations));
+        await new Promise(function(resolve) { requestAnimationFrame(resolve); });
+
         var pdfDocOut = await PDFLib.PDFDocument.load(originalFileBuffer.slice(0));
         var pages = pdfDocOut.getPages();
 
         var hasAny = false;
-        for (var k in annotations) { if (annotations[k] && annotations[k].length > 0) { hasAny = true; break; } }
+        for (var k in annotationSnapshot) { if (annotationSnapshot[k] && annotationSnapshot[k].length > 0) { hasAny = true; break; } }
         if (!hasAny) {
             showMessage('没有需要保存的批注', true);
             setSaveBusy(false);
             return;
         }
 
-        for (var pKey in annotations) {
+        for (var pKey in annotationSnapshot) {
             var pIdx = parseInt(pKey) - 1;
             if (pIdx < 0 || pIdx >= pages.length) continue;
             var page = pages[pIdx];
@@ -837,19 +897,20 @@ async function savePDF() {
 
             var ratio = 1.0 / info.scale;
 
-            for (var ai = 0; ai < annotations[pKey].length; ai++) {
-                var a = annotations[pKey][ai];
+            for (var ai = 0; ai < annotationSnapshot[pKey].length; ai++) {
+                var a = annotationSnapshot[pKey][ai];
                 var imgResult = captureAnnotation(a.text, a.size, a.color, a.wCss, a.hCss);
                 if (imgResult.data.length === 0) continue;
 
                 var pngImage = await pdfDocOut.embedPng(imgResult.data);
 
                 var boxW = a.wCss * ratio;
-                var boxH = a.hCss * ratio;
+                var boxH = imgResult.heightCss * ratio;
                 var pdfX = a.xPx * ratio;
                 var pdfY = info.pdfH - (a.yPx * ratio) - boxH;
 
                 page.drawImage(pngImage, { x: pdfX, y: pdfY, width: boxW, height: boxH });
+                await new Promise(function(resolve) { setTimeout(resolve, 0); });
             }
         }
 
