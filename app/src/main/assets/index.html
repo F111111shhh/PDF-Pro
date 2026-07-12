@@ -192,7 +192,10 @@ _wrapProbe.style.cssText = 'position:fixed;left:-99999px;top:-99999px;visibility
     'line-height:' + LH + ';font-family:' + FF;
 document.body.appendChild(_wrapProbe);
 
+var baselineOffsetCache = {};
+
 function measureBaselineOffset(fontSize) {
+    if (baselineOffsetCache[fontSize] !== undefined) return baselineOffsetCache[fontSize];
     var div = document.createElement('div');
     div.style.cssText = 'position:absolute;left:-9999px;top:-9999px;' +
         'font-family:' + FF + ';font-size:' + fontSize + 'px;font-weight:bold;' +
@@ -206,6 +209,7 @@ function measureBaselineOffset(fontSize) {
     document.body.appendChild(div);
     var result = probe.getBoundingClientRect().top - div.getBoundingClientRect().top;
     document.body.removeChild(div);
+    baselineOffsetCache[fontSize] = result;
     return result;
 }
 
@@ -404,6 +408,9 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
 
 async function initView() {
     var loadId = ++documentLoadId;
+    if (sliderZoomFrame !== null) cancelAnimationFrame(sliderZoomFrame);
+    sliderZoomFrame = null;
+    pendingSliderZoom = 1.0;
     contentLayer.innerHTML = '';
     scrollWindow.scrollTop = 0;
     scrollWindow.scrollLeft = 0;
@@ -535,12 +542,12 @@ function schedulePageUnload(pageNumber, container) {
 }
 
 /* ===== 缩放 ===== */
-function updateZoomLayout() {
+function updateZoomLayout(updateScrollbar) {
     contentLayer.style.transform = 'scale(' + scaleState + ')';
     sizingContainer.style.width = (baseWidth * scaleState) + 'px';
     sizingContainer.style.height = (baseHeight * scaleState) + 'px';
     zoomSlider.value = scaleState.toFixed(1); zoomValDisplay.innerText = scaleState.toFixed(1);
-    updateScrollThumb();
+    if (updateScrollbar !== false) updateScrollThumb();
 }
 
 function applyZoom(ns) {
@@ -549,14 +556,23 @@ function applyZoom(ns) {
     var sl = scrollWindow.scrollLeft, st = scrollWindow.scrollTop;
     var cw = baseWidth * os, clo = cw < r.width ? (r.width - cw) / 2 : 0;
     var ax = (sl + vcx - clo) / os, ay = (st + vcy) / os;
-    scaleState = ns; updateZoomLayout();
+    scaleState = ns; updateZoomLayout(false);
     var nw = baseWidth * ns, nlo = nw < r.width ? (r.width - nw) / 2 : 0;
     scrollWindow.scrollLeft = Math.max(0, nw <= r.width ? 0 : (ax * ns) + nlo - vcx);
     scrollWindow.scrollTop = Math.max(0, (ay * ns) - vcy);
     updateScrollThumb();
 }
 
-function handleSliderZoom(v) { applyZoom(+v); }
+var pendingSliderZoom = 1.0, sliderZoomFrame = null;
+function handleSliderZoom(v) {
+    pendingSliderZoom = +v;
+    zoomValDisplay.innerText = pendingSliderZoom.toFixed(1);
+    if (sliderZoomFrame !== null) return;
+    sliderZoomFrame = requestAnimationFrame(function() {
+        sliderZoomFrame = null;
+        applyZoom(pendingSliderZoom);
+    });
+}
 
 var startDist = 0, pinchSS = 1, isZooming = false, rafP = false;
 scrollWindow.addEventListener('touchstart', function(e) {
@@ -822,18 +838,14 @@ function captureAnnotation(text, fontSize, colorStr, wCss, hCss) {
     var cH = Math.round(requiredHeightCss * DPR);
     if (cW <= 0 || cH <= 0 || cW > 16384 || cH > 16384) return { data: new Uint8Array(0) };
 
-    var edge = edgeCss * DPR;
-    var fontPx = fontSize * DPR;
-    var canvasLineH = cssLineH * DPR;
-
     var baselineCSS = measureBaselineOffset(fontSize);
-    var baselinePx = baselineCSS * DPR;
 
     var canvas = document.createElement('canvas');
     canvas.width = cW; canvas.height = cH;
     var ctx = canvas.getContext('2d');
 
-    ctx.font = 'bold ' + fontPx + 'px ' + FF;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.font = 'bold ' + fontSize + 'px ' + FF;
     ctx.fillStyle = colorStr;
     ctx.textBaseline = 'alphabetic';
 
@@ -841,16 +853,8 @@ function captureAnnotation(text, fontSize, colorStr, wCss, hCss) {
         var lineText = lines[i];
         if (!lineText) continue;
 
-        var baseY = edge + i * canvasLineH + baselinePx;
-        var domLineW = measureLine(lineText, fontSize).width;
-        var canvasLineW = ctx.measureText(lineText).width;
-        
-        var scaleX = (canvasLineW > 0 && domLineW > 0) ? (domLineW * DPR) / canvasLineW : 1;
-        ctx.save();
-        ctx.translate(edge, baseY);
-        ctx.scale(scaleX, 1);
-        ctx.fillText(lineText, 0, 0);
-        ctx.restore();
+        var baseY = edgeCss + i * cssLineH + baselineCSS;
+        ctx.fillText(lineText, edgeCss, baseY);
     }
 
     var url = canvas.toDataURL('image/png');
