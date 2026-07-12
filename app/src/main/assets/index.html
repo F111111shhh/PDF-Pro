@@ -38,7 +38,7 @@ html,body{width:100%;height:100%;margin:0;padding:0;background-color:var(--bg);f
 #centerOpenBtn button{pointer-events:auto}
 .page-pill{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;pointer-events:none;z-index:16}
 .annotation-item,.input-box{position:absolute;font-family:var(--font-family);font-weight:bold;line-height:var(--line-height);padding:var(--pad);z-index:100;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:4px;transform-origin:0 0;min-width:10px;min-height:1em}
-.annotation-item{border:1px solid transparent}
+.annotation-item{border:1px solid transparent;contain:layout}
 .annotation-item.selected{border:1px solid var(--primary);background:rgba(0,122,255,.1);z-index:101}
 .input-box{background:rgba(255,255,255,.95);border:1px solid var(--primary);outline:none;resize:none;box-shadow:0 4px 15px rgba(0,0,0,.15);z-index:200;overflow:hidden}
 .del-btn{position:absolute;font-size:1em;width:1.3em;height:1.3em;top:-.65em;right:-.65em;align-items:center;justify-content:center;background:#FF3B30;color:#fff;border-radius:50%;box-shadow:0 2px 5px rgba(0,0,0,.3);z-index:102;display:none;cursor:pointer;pointer-events:auto}
@@ -133,6 +133,7 @@ var lastBlurTS = 0, justDeleted = false;
 var scaleState = 1.0, baseWidth = 0, baseHeight = 0;
 var pageObserver = null, renderObserver = null;
 var pageInfoMap = {}, pageRenderState = {}, documentLoadId = 0;
+var activeRenderCount = 0, renderQueue = [], MAX_ACTIVE_RENDERS = 2;
 var isSaveInProgress = false, isAnnotationDragging = false, nativeSaveTimer = null, messageTimer = null;
 
 var scrollWindow = document.getElementById('scrollWindow');
@@ -142,6 +143,7 @@ var zoomSlider = document.getElementById('zoomSlider');
 var zoomValDisplay = document.getElementById('zoomVal');
 var scrollThumb = document.getElementById('scrollThumb');
 var scrollTrack = document.getElementById('customScrollbarTrack');
+var cachedScrollHeight = 0, cachedViewportHeight = 0, cachedTrackHeight = 0;
 
 function showMessage(message, isError) {
     var box = document.getElementById('appMessage');
@@ -295,12 +297,21 @@ function handleBackPress() {
 var isThumbDrag = false, thumbDSY = 0, thumbDSST = 0;
 
 function updateScrollThumb() {
-    var st = scrollWindow.scrollTop, sH = scrollWindow.scrollHeight, cH = scrollWindow.clientHeight;
+    var st = scrollWindow.scrollTop;
+    var cH = cachedViewportHeight || scrollWindow.clientHeight;
+    var sH = cachedScrollHeight || scrollWindow.scrollHeight;
     if (sH <= cH + 1) { scrollThumb.classList.add('hidden'); return; }
     scrollThumb.classList.remove('hidden');
-    var tH = scrollTrack.clientHeight, thH = Math.max(48, (cH / sH) * tH), mT = tH - thH;
+    var tH = cachedTrackHeight || scrollTrack.clientHeight;
+    var thH = Math.max(48, (cH / sH) * tH), mT = tH - thH;
     scrollThumb.style.height = thH + 'px';
     scrollThumb.style.transform = 'translateY(' + (st / (sH - cH)) * mT + 'px)';
+}
+
+function refreshScrollMetrics() {
+    cachedViewportHeight = scrollWindow.clientHeight;
+    cachedScrollHeight = scrollWindow.scrollHeight;
+    cachedTrackHeight = scrollTrack.clientHeight;
 }
 
 scrollThumb.addEventListener('touchstart', function(e) {
@@ -314,7 +325,8 @@ window.addEventListener('touchmove', function(e) {
     var dy = e.touches[0].clientY - thumbDSY;
     var tH = scrollTrack.clientHeight, thH = parseFloat(scrollThumb.style.height) || 40, mT = tH - thH;
     if (mT <= 0) return;
-    scrollWindow.scrollTop = thumbDSST + (dy / mT) * (scrollWindow.scrollHeight - scrollWindow.clientHeight);
+    var maxScroll = Math.max(0, (cachedScrollHeight || scrollWindow.scrollHeight) - (cachedViewportHeight || scrollWindow.clientHeight));
+    scrollWindow.scrollTop = thumbDSST + (dy / mT) * maxScroll;
 }, { passive: false });
 
 window.addEventListener('touchend', function() {
@@ -322,7 +334,7 @@ window.addEventListener('touchend', function() {
 });
 
 scrollWindow.addEventListener('scroll', updateScrollThumb);
-window.addEventListener('resize', updateScrollThumb);
+window.addEventListener('resize', function() { refreshScrollMetrics(); updateScrollThumb(); });
 
 /* ===== 工具栏 ===== */
 function toggleToolbar(f) {
@@ -416,6 +428,11 @@ async function initView() {
     scrollWindow.scrollLeft = 0;
     if (pageObserver) { pageObserver.disconnect(); pageObserver = null; }
     if (renderObserver) { renderObserver.disconnect(); renderObserver = null; }
+    Object.keys(pageRenderState).forEach(function(pageNumber) {
+        var oldState = pageRenderState[pageNumber];
+        if (oldState && oldState.renderTask) oldState.renderTask.cancel();
+    });
+    renderQueue = [];
     pageRenderState = {};
 
     var p1 = await pdfDoc.getPage(1);
@@ -448,7 +465,11 @@ async function initView() {
 
         pd.style.width = cssW + 'px'; pd.style.height = cssH + 'px';
         contentLayer.appendChild(pd);
-        pageRenderState[i] = { rendered: false, rendering: false, renderToken: 0, canvas: null, renderTask: null, unloadTimer: null, renderScale: rScale };
+        pageRenderState[i] = {
+            rendered: false, rendering: false, queued: false, wanted: false,
+            discardAfterRender: false, renderToken: 0, canvas: null,
+            renderTask: null, unloadTimer: null, renderScale: rScale
+        };
 
         if (vpBase.width > maxW) maxW = vpBase.width;
         totalH += vpBase.height + 15;
@@ -460,7 +481,9 @@ async function initView() {
     scaleState = 1.0; zoomSlider.value = 1.0; zoomValDisplay.innerText = '1.0';
     updateZoomLayout();
     setupPageObserver(loadId);
-    renderPage(1, document.getElementById('page-1'), loadId);
+    var firstState = pageRenderState[1];
+    if (firstState) firstState.wanted = true;
+    requestRenderPage(1, document.getElementById('page-1'), loadId);
 }
 
 function setupPageObserver(loadId) {
@@ -474,11 +497,17 @@ function setupPageObserver(loadId) {
     renderObserver = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
             var pageNumber = parseInt(entry.target.getAttribute('data-page'));
+            var state = pageRenderState[pageNumber];
+            if (!state) return;
             if (entry.isIntersecting) {
-                var state = pageRenderState[pageNumber];
-                if (state) { clearTimeout(state.unloadTimer); state.unloadTimer = null; }
-                renderPage(pageNumber, entry.target, loadId);
+                state.wanted = true;
+                state.discardAfterRender = false;
+                clearTimeout(state.unloadTimer); state.unloadTimer = null;
+                requestRenderPage(pageNumber, entry.target, loadId);
             } else {
+                state.wanted = false;
+                state.discardAfterRender = true;
+                if (state.rendering && state.renderTask) state.renderTask.cancel();
                 schedulePageUnload(pageNumber, entry.target);
             }
         });
@@ -489,17 +518,42 @@ function setupPageObserver(loadId) {
     });
 }
 
+function requestRenderPage(pageNumber, container, loadId) {
+    var state = pageRenderState[pageNumber];
+    if (!state || state.rendered || state.rendering || state.queued || loadId !== documentLoadId || !state.wanted) return;
+    if (activeRenderCount >= MAX_ACTIVE_RENDERS) {
+        state.queued = true;
+        renderQueue.push({ pageNumber: pageNumber, container: container, loadId: loadId });
+        return;
+    }
+    renderPage(pageNumber, container, loadId);
+}
+
+function drainRenderQueue() {
+    while (activeRenderCount < MAX_ACTIVE_RENDERS && renderQueue.length > 0) {
+        var next = renderQueue.shift();
+        var state = pageRenderState[next.pageNumber];
+        if (!state) continue;
+        state.queued = false;
+        if (next.loadId !== documentLoadId || !state.wanted || state.rendered || state.rendering) continue;
+        renderPage(next.pageNumber, next.container, next.loadId);
+    }
+}
+
 async function renderPage(pageNumber, container, loadId) {
     var state = pageRenderState[pageNumber];
     if (!state || state.rendered || state.rendering || loadId !== documentLoadId) return;
 
     state.rendering = true;
+    state.discardAfterRender = false;
+    activeRenderCount++;
     var renderToken = ++state.renderToken;
+    var canvas = null;
     try {
         var page = await pdfDoc.getPage(pageNumber);
         if (loadId !== documentLoadId || state.renderToken !== renderToken) return;
         var viewport = page.getViewport({ scale: state.renderScale });
-        var canvas = document.createElement('canvas');
+        canvas = document.createElement('canvas');
         canvas.className = 'page-canvas';
         canvas.width = Math.ceil(viewport.width);
         canvas.height = Math.ceil(viewport.height);
@@ -507,18 +561,26 @@ async function renderPage(pageNumber, container, loadId) {
         state.canvas = canvas;
         state.renderTask = page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
         await state.renderTask.promise;
-        if (loadId !== documentLoadId || state.renderToken !== renderToken || state.canvas !== canvas) {
+        if (loadId !== documentLoadId || state.renderToken !== renderToken || state.canvas !== canvas || !state.wanted || state.discardAfterRender) {
             canvas.remove();
+            state.canvas = null;
             return;
         }
         state.rendered = true;
     } catch (err) {
-        if (loadId === documentLoadId && state.renderToken === renderToken) console.error('页面渲染失败:', err);
+        if (canvas && state.canvas === canvas && (!state.wanted || state.discardAfterRender || state.renderToken !== renderToken)) {
+            canvas.remove();
+            state.canvas = null;
+        }
+        var cancelled = state.discardAfterRender || err && (err.name === 'RenderingCancelledException' || err.name === 'AbortException');
+        if (!cancelled && loadId === documentLoadId && state.renderToken === renderToken) console.error('页面渲染失败:', err);
     } finally {
         if (state.renderToken === renderToken) {
             state.rendering = false;
             state.renderTask = null;
         }
+        activeRenderCount = Math.max(0, activeRenderCount - 1);
+        drainRenderQueue();
     }
 }
 
@@ -547,6 +609,7 @@ function updateZoomLayout(updateScrollbar) {
     sizingContainer.style.width = (baseWidth * scaleState) + 'px';
     sizingContainer.style.height = (baseHeight * scaleState) + 'px';
     zoomSlider.value = scaleState.toFixed(1); zoomValDisplay.innerText = scaleState.toFixed(1);
+    refreshScrollMetrics();
     if (updateScrollbar !== false) updateScrollThumb();
 }
 
@@ -670,6 +733,15 @@ function makeDraggable(el, page, onDragEnd, onTapSelected) {
     var isDrag = false, dsx, dsy, dsl, dst, moved = false;
     var currentDx = 0, currentDy = 0, rafPending = false;
 
+    var applyDragPosition = function() {
+        var pr = page.getBoundingClientRect(), sc = pr.width / parseFloat(page.style.width);
+        var pw = parseFloat(page.style.width), ph = parseFloat(page.style.height);
+        var maxLeft = Math.max(0, 100 - (el.offsetWidth / pw * 100));
+        var maxTop = Math.max(0, 100 - (el.offsetHeight / ph * 100));
+        el.style.left = Math.max(0, Math.min(maxLeft, dsl + (currentDx / sc) / pw * 100)) + '%';
+        el.style.top = Math.max(0, Math.min(maxTop, dst + (currentDy / sc) / ph * 100)) + '%';
+    };
+
     var moveH = function(e) {
         if (!isDrag) return; e.preventDefault();
         var t = e.touches ? e.touches[0] : e;
@@ -681,12 +753,7 @@ function makeDraggable(el, page, onDragEnd, onTapSelected) {
             rafPending = true;
             requestAnimationFrame(function() {
                 if (!isDrag) { rafPending = false; return; }
-                var pr = page.getBoundingClientRect(), sc = pr.width / parseFloat(page.style.width);
-                var pw = parseFloat(page.style.width), ph = parseFloat(page.style.height);
-                var maxLeft = Math.max(0, 100 - (el.offsetWidth / pw * 100));
-                var maxTop = Math.max(0, 100 - (el.offsetHeight / ph * 100));
-                el.style.left = Math.max(0, Math.min(maxLeft, dsl + (currentDx / sc) / pw * 100)) + '%';
-                el.style.top = Math.max(0, Math.min(maxTop, dst + (currentDy / sc) / ph * 100)) + '%';
+                applyDragPosition();
                 rafPending = false;
             });
         }
@@ -696,17 +763,19 @@ function makeDraggable(el, page, onDragEnd, onTapSelected) {
         isAnnotationDragging = false;
         window.removeEventListener('touchmove', moveH); window.removeEventListener('touchend', endH); window.removeEventListener('touchcancel', endH);
         window.removeEventListener('mousemove', moveH); window.removeEventListener('mouseup', endH);
-
         if (e && e.type === 'touchcancel') return;
-        
-        if (!moved) { 
+        // A cancelled touch must not enter the tap-to-edit path.
+        if (!moved) {
             // 如果没发生拖动，说明是在已选中的批注上点了一下，触发编辑
-            if (onTapSelected) onTapSelected(); 
-        } else { 
-            if (onDragEnd) { 
-                var pw = parseFloat(page.style.width), ph = parseFloat(page.style.height); 
-                onDragEnd(parseFloat(el.style.left) / 100 * pw, parseFloat(el.style.top) / 100 * ph); 
-            } 
+            if (onTapSelected) onTapSelected();
+        } else {
+            if (onDragEnd) {
+                // A release can arrive before the queued animation frame. Commit
+                // from the latest pointer delta so saved coordinates match the UI.
+                applyDragPosition();
+                var pw = parseFloat(page.style.width), ph = parseFloat(page.style.height);
+                onDragEnd(parseFloat(el.style.left) / 100 * pw, parseFloat(el.style.top) / 100 * ph);
+            }
         }
     };
     var startH = function(e) {
@@ -899,7 +968,11 @@ async function savePDF() {
             var info = pageInfoMap[parseInt(pKey)];
             if (!info) continue;
 
-            var ratio = 1.0 / info.scale;
+            // Map from the actual integer CSS page box back to PDF points.
+            // The rendered page uses cssW/cssH after flooring viewport values,
+            // so one shared initial scale can introduce a visible edge drift.
+            var ratioX = info.pdfW / info.cssW;
+            var ratioY = info.pdfH / info.cssH;
 
             for (var ai = 0; ai < annotationSnapshot[pKey].length; ai++) {
                 var a = annotationSnapshot[pKey][ai];
@@ -908,10 +981,13 @@ async function savePDF() {
 
                 var pngImage = await pdfDocOut.embedPng(imgResult.data);
 
-                var boxW = a.wCss * ratio;
-                var boxH = imgResult.heightCss * ratio;
-                var pdfX = a.xPx * ratio;
-                var pdfY = info.pdfH - (a.yPx * ratio) - boxH;
+                // Keep the original annotation box as the placement contract.
+                // The raster may have a little extra transparent bottom padding
+                // for rounding, but that padding must not move the annotation.
+                var boxW = a.wCss * ratioX;
+                var boxH = a.hCss * ratioY;
+                var pdfX = a.xPx * ratioX;
+                var pdfY = info.pdfH - (a.yPx * ratioY) - boxH;
 
                 page.drawImage(pngImage, { x: pdfX, y: pdfY, width: boxW, height: boxH });
                 await new Promise(function(resolve) { setTimeout(resolve, 0); });

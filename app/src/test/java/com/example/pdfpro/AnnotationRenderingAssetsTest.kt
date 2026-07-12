@@ -15,6 +15,20 @@ class AnnotationRenderingAssetsTest {
     }
 
     @Test
+    fun annotationPlacementUsesTheActualPageBoxAndFinalDragDelta() {
+        assertTrue(html.contains("var ratioX = info.pdfW / info.cssW;"))
+        assertTrue(html.contains("var ratioY = info.pdfH / info.cssH;"))
+        assertTrue(html.contains("applyDragPosition();"))
+    }
+
+    @Test
+    fun pageRenderingUsesABoundedQueue() {
+        assertTrue(html.contains("MAX_ACTIVE_RENDERS = 2"))
+        assertTrue(html.contains("state.renderTask.cancel()"))
+        assertTrue(html.contains("requestRenderPage(pageNumber"))
+    }
+
+    @Test
     fun zoomSliderCoalescesUpdatesByAnimationFrame() {
         assertTrue(html.contains("sliderZoomFrame = requestAnimationFrame"))
         assertTrue(html.contains("applyZoom(pendingSliderZoom)"))
