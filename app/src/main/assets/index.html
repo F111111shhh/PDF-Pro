@@ -968,11 +968,8 @@ async function savePDF() {
             var info = pageInfoMap[parseInt(pKey)];
             if (!info) continue;
 
-            // Map from the actual integer CSS page box back to PDF points.
-            // The rendered page uses cssW/cssH after flooring viewport values,
-            // so one shared initial scale can introduce a visible edge drift.
-            var ratioX = info.pdfW / info.cssW;
-            var ratioY = info.pdfH / info.cssH;
+            // Keep the original placement conversion used by the stable build.
+            var ratio = 1.0 / info.scale;
 
             for (var ai = 0; ai < annotationSnapshot[pKey].length; ai++) {
                 var a = annotationSnapshot[pKey][ai];
@@ -981,13 +978,10 @@ async function savePDF() {
 
                 var pngImage = await pdfDocOut.embedPng(imgResult.data);
 
-                // Keep the original annotation box as the placement contract.
-                // The raster may have a little extra transparent bottom padding
-                // for rounding, but that padding must not move the annotation.
-                var boxW = a.wCss * ratioX;
-                var boxH = a.hCss * ratioY;
-                var pdfX = a.xPx * ratioX;
-                var pdfY = info.pdfH - (a.yPx * ratioY) - boxH;
+                var boxW = a.wCss * ratio;
+                var boxH = a.hCss * ratio;
+                var pdfX = a.xPx * ratio;
+                var pdfY = info.pdfH - (a.yPx * ratio) - boxH;
 
                 page.drawImage(pngImage, { x: pdfX, y: pdfY, width: boxW, height: boxH });
                 await new Promise(function(resolve) { setTimeout(resolve, 0); });

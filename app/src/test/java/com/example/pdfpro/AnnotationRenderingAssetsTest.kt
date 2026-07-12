@@ -16,8 +16,8 @@ class AnnotationRenderingAssetsTest {
 
     @Test
     fun annotationPlacementUsesTheActualPageBoxAndFinalDragDelta() {
-        assertTrue(html.contains("var ratioX = info.pdfW / info.cssW;"))
-        assertTrue(html.contains("var ratioY = info.pdfH / info.cssH;"))
+        assertTrue(html.contains("var ratio = 1.0 / info.scale;"))
+        assertTrue(html.contains("var boxH = a.hCss * ratio;"))
         assertTrue(html.contains("applyDragPosition();"))
     }
 
